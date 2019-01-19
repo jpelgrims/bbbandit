@@ -191,9 +191,14 @@ WHILE running = 1
 
     endTime# = TIMER(.001)
 
-    frameTime# = endTime - startTime
-    IF frameTime# < 1 / 60 THEN
-        'SLEEP 1 / 60 - frameTime#
+    'DO WHILE endTime# - startTime < (1 / 60)
+    '    endTime# = TIMER(.001)
+    'LOOP
+
+    ' It might be that SLEEP doesn't allow more than 1/18th of a second, check this out later
+    frameTime# = endTime# - startTime
+    IF frameTime# < (1 / 60) THEN
+        SLEEP (1 / 60) - frameTime#
     END IF
 
 
