@@ -1,5 +1,5 @@
 DECLARE create_world (width AS INTEGER, height AS INTEGER, world() AS INTEGER)
-DECLARE draw_vertical_line (x AS INTEGER, drawStart AS INTEGER, drawEnd AS INTEGER, colour AS INTEGER)
+DECLARE draw_vertical_line (x AS INTEGER, drawStart AS INTEGER, drawEnd AS INTEGER, screen_height AS INTEGER, colour AS INTEGER)
 
 DIM map_width AS INTEGER
 DIM map_height AS INTEGER
@@ -158,35 +158,41 @@ WHILE running = 1
             colour = 8
         END IF
 
-        LINE (x, 0)-(x, drawStart), 9
-        LINE (x, drawStart)-(x, drawEnd), colour
-        LINE (x, drawEnd)-(x, screen_height), 6
+        CALL draw_vertical_line(x, drawStart, drawEnd, screen_height, colour)
     NEXT
 
     PCOPY 1, 0
 
-    keypress$ = read_key$
-
-    IF keypress$ = "UP" THEN
+    IF IS_PRESSED("UP") THEN
         posX = posX + dirX * moveSpeed
         posY = posY + dirY * moveSpeed
-    ELSEIF keypress$ = "DOWN" THEN
+    END IF
+
+    IF IS_PRESSED("DOWN") THEN
         posX = posX - dirX * moveSpeed
         posY = posY - dirY * moveSpeed
-    ELSEIF keypress$ = "RIGHT" THEN
+    END IF
+
+    IF IS_PRESSED("RIGHT") THEN
         oldDirX = dirX
         dirX = dirX * COS(-rotSpeed) - dirY * SIN(-rotSpeed)
         dirY = oldDirX * SIN(-rotSpeed) + dirY * COS(-rotSpeed)
         oldPlaneX = planeX
         planeX = planeX * COS(-rotSpeed) - planeY * SIN(-rotSpeed)
         planeY = oldPlaneX * SIN(-rotSpeed) + planeY * COS(-rotSpeed)
-    ELSEIF keypress$ = "LEFT" THEN
+    END IF
+
+    IF IS_PRESSED("LEFT") THEN
         oldDirX = dirX
         dirX = dirX * COS(rotSpeed) - dirY * SIN(rotSpeed)
         dirY = oldDirX * SIN(rotSpeed) + dirY * COS(rotSpeed)
         oldPlaneX = planeX
         planeX = planeX * COS(rotdSpeed) - planeY * SIN(rotSpeed)
         planeY = oldPlaneX * SIN(rotSpeed) + planeY * COS(rotSpeed)
+    END IF
+
+    IF IS_PRESSED("ESCAPE") OR IS_PRESSED("Q") THEN
+        SYSTEM
     END IF
 
     endTime# = TIMER(.001)
@@ -201,13 +207,15 @@ WHILE running = 1
         SLEEP (1 / 60) - frameTime#
     END IF
 
-
-
 WEND
 
-' use this function to also draw ceiling and floor
-FUNCTION draw_vertical_line (x, drawStart, drawEnd, colour)
-END FUNCTION
+
+SUB draw_vertical_line (x AS INTEGER, drawStart AS INTEGER, drawEnd AS INTEGER, screen_height AS INTEGER, colour AS INTEGER)
+    LINE (x, 0)-(x, drawStart), 9
+    LINE (x, drawStart)-(x, drawEnd), colour
+    LINE (x, drawEnd)-(x, screen_height), 6
+END SUB
+
 
 SUB create_world (map_width AS INTEGER, map_height AS INTEGER, world() AS INTEGER)
     ' create a world, store it in a multimdimensional array and return it
@@ -234,30 +242,49 @@ SUB create_world (map_width AS INTEGER, map_height AS INTEGER, world() AS INTEGE
 
 END SUB
 
-FUNCTION read_key$
-    DIM S AS INTEGER
-    DIM return_key AS STRING
-    S = 0
-
-    'DO
-    '    S = INP(&H60)
-    'LOOP UNTIL LEN(S)
-
-    S = INP(&H60)
-
-    SELECT CASE S
-        CASE 72: return_key = "UP"
-        CASE 80: return_key = "DOWN"
-        CASE 75: return_key = "LEFT"
-        CASE 77: return_key = "RIGHT"
-        CASE 16, 1: SYSTEM
-        CASE ELSE: return_key = ""
-    END SELECT
-    read_key = return_key
-END FUNCTION
 
 SUB screen_setup (screen_width AS INTEGER, screen_height AS INTEGER)
     SCREEN 7, 0, 1, 0
 END SUB
 
 
+FUNCTION IS_PRESSED (key_name AS STRING)
+    DIM key_code AS INTEGER
+
+    SELECT CASE key_name
+        CASE "UP": key_code = 72
+        CASE "DOWN": key_code = 80
+        CASE "LEFT": key_code = 75
+        CASE "RIGHT": key_code = 77
+        CASE "ESCAPE": key_code = 1
+        CASE "Q": key_code = 16
+        CASE ELSE: key_code = 0
+    END SELECT
+
+    '---------
+    ' This piece of code is an improvement (by Joe Huber) of the original multikey demo code written by Eric Carr
+    '---------
+
+    STATIC FIRST_TIME, KEYS(), SC(), DU()
+
+    IF FIRST_TIME = 0 THEN
+        DIM KEYS(255), SC(255), DU(255)
+        FOR E = 0 TO 127
+            SC(E) = E: DU(E) = 1
+        NEXT
+        FOR E = 128 TO 255
+            SC(E) = E - 128: DU(E) = 0
+        NEXT
+        FIRST_TIME = -1
+    END IF
+
+    I$ = INKEY$ ' So the keyb buffer don't get full     \routine/ \
+    I = INP(&H60) ' Get keyboard scan code from port 60h   \lines/
+    OUT &H61, INP(&H61) OR &H82: OUT &H20, &H20 '         \!!!/   |
+    KEYS(SC(I)) = DU(I) ' This says what keys are pressed        \!
+
+    '---------
+
+    IS_PRESSED = KEYS(key_code)
+
+END FUNCTION
