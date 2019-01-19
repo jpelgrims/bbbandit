@@ -1,8 +1,10 @@
+REM $DYNAMIC
+
 DECLARE create_world (width AS INTEGER, height AS INTEGER, world() AS INTEGER)
 DECLARE draw_vertical_line (x AS INTEGER, drawStart AS INTEGER, drawEnd AS INTEGER, screen_height AS INTEGER, colour AS INTEGER)
 
-DIM map_width AS INTEGER
-DIM map_height AS INTEGER
+DIM SHARED map_width AS INTEGER
+DIM SHARED map_height AS INTEGER
 
 DIM posX AS DOUBLE
 DIM posY AS DOUBLE
@@ -25,20 +27,18 @@ rotSpeed# = 0.01
 running = 1
 startTime = TIMER
 
-map_width = 24
-map_height = 24
-
 screen_width = 320
 screen_height = 200
 
-DIM world(map_width - 1, map_height - 1) AS INTEGER
+DIM world(1, 1) AS INTEGER
 
 
-posX = 22: posY = 12
+posX = 3: posY = 3
 dirX = -1: dirY = 0
 planeX = 0: planeY = 0.66
 
-CALL create_world(map_width, map_height, world())
+'CALL create_world(24, 24, world())
+CALL load_map("map.txt", world())
 CALL screen_setup(screen_width, screen_height)
 
 WHILE running = 1
@@ -130,7 +130,7 @@ WHILE running = 1
         ' Calculate height of line to draw on screen
         lineHeight = screen_height / perpWallDist
 
-        ' Calmmcualte lowest and highest pixel to fill in current stripe
+        ' Calculate lowest and highest pixel to fill in current stripe
         DIM drawStart AS INTEGER
 
         drawStart = -lineHeight / 2 + screen_height / 2
@@ -235,6 +235,8 @@ END SUB
 SUB create_world (map_width AS INTEGER, map_height AS INTEGER, world() AS INTEGER)
     ' create a world, store it in a multimdimensional array and return it
 
+    REDIM world(map_width - 1, map_height - 1) AS INTEGER
+
     FOR y = 0 TO map_height - 1
         FOR x = 0 TO map_width - 1
             world(x, y) = 0
@@ -260,6 +262,7 @@ END SUB
 
 SUB screen_setup (screen_width AS INTEGER, screen_height AS INTEGER)
     SCREEN 7, 0, 1, 0
+    _FULLSCREEN 'QB64 full screen mode, also works with alt+enter
 END SUB
 
 
@@ -303,3 +306,44 @@ FUNCTION IS_PRESSED (key_name AS STRING)
     IS_PRESSED = KEYS(key_code)
 
 END FUNCTION
+
+SUB load_map (filename AS STRING, world() AS INTEGER)
+    OPEN filename FOR INPUT AS 1
+    IF errorflag <> 0 THEN
+        errorflag = 0
+        CLOSE
+        PRINT "File not found"
+        SLEEP 2
+        END
+    END IF
+
+    ' Search the map dimensions
+    map_height = 0
+    map_width = 0
+
+    DO WHILE NOT EOF(1)
+        LINE INPUT #1, l$
+
+        IF l$ <> "" THEN
+            map_height = map_height + 1
+        END IF
+
+
+        IF map_width = 0 AND LEN(l$) > 0 THEN
+            map_width = LEN(l$)
+        END IF
+    LOOP
+
+    REDIM world(map_width - 1, map_height - 1) AS INTEGER
+    DIM text_line AS STRING
+
+    SEEK #1, 1 ' Rewind cursor to beginning of file
+    FOR i = 0 TO map_height - 1
+        LINE INPUT #1, text_line
+        FOR letter = 1 TO map_width
+            world(letter - 1, i) = VAL(MID$(text_line, letter, 1))
+            PRINT letter - 1, i, VAL(MID$(text_line, letter, 1))
+        NEXT
+    NEXT
+
+END SUB
