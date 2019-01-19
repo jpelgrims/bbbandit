@@ -174,26 +174,41 @@ WHILE running = 1
     END IF
 
     IF IS_PRESSED("RIGHT") THEN
-        oldDirX = dirX
-        dirX = dirX * COS(-rotSpeed) - dirY * SIN(-rotSpeed)
-        dirY = oldDirX * SIN(-rotSpeed) + dirY * COS(-rotSpeed)
-        oldPlaneX = planeX
-        planeX = planeX * COS(-rotSpeed) - planeY * SIN(-rotSpeed)
-        planeY = oldPlaneX * SIN(-rotSpeed) + planeY * COS(-rotSpeed)
+        posX = posX + planeX * moveSpeed
+        posY = posY + planeY * moveSpeed
     END IF
 
     IF IS_PRESSED("LEFT") THEN
-        oldDirX = dirX
-        dirX = dirX * COS(rotSpeed) - dirY * SIN(rotSpeed)
-        dirY = oldDirX * SIN(rotSpeed) + dirY * COS(rotSpeed)
-        oldPlaneX = planeX
-        planeX = planeX * COS(rotdSpeed) - planeY * SIN(rotSpeed)
-        planeY = oldPlaneX * SIN(rotSpeed) + planeY * COS(rotSpeed)
+        posX = posX - planeX * moveSpeed
+        posY = posY - planeY * moveSpeed
     END IF
 
     IF IS_PRESSED("ESCAPE") OR IS_PRESSED("Q") THEN
         SYSTEM
     END IF
+
+    ' Mouse viewing using QB64 features
+    _MOUSEHIDE
+    DO WHILE _MOUSEINPUT
+        m = 4
+        IF _MOUSEMOVEMENTX < 0 THEN
+            oldDirX = dirX
+            dirX = dirX * COS(rotSpeed * m) - dirY * SIN(rotSpeed * m)
+            dirY = oldDirX * SIN(rotSpeed * m) + dirY * COS(rotSpeed * m)
+            oldPlaneX = planeX
+            planeX = planeX * COS(rotdSpeed * m) - planeY * SIN(rotSpeed * m)
+            planeY = oldPlaneX * SIN(rotSpeed * m) + planeY * COS(rotSpeed * m)
+        ELSEIF _MOUSEMOVEMENTX > 0 THEN
+            oldDirX = dirX
+            dirX = dirX * COS(-rotSpeed * m) - dirY * SIN(-rotSpeed * m)
+            dirY = oldDirX * SIN(-rotSpeed * m) + dirY * COS(-rotSpeed * m)
+            oldPlaneX = planeX
+            planeX = planeX * COS(-rotSpeed * m) - planeY * SIN(-rotSpeed * m)
+            planeY = oldPlaneX * SIN(-rotSpeed * m) + planeY * COS(-rotSpeed * m)
+        END IF
+
+    LOOP
+    _MOUSEMOVE screen_width / 2, screen_height / 2 ' Lock mouse pointer to application by moving it to the middle of the screen
 
     endTime# = TIMER(.001)
 
