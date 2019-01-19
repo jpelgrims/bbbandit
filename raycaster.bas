@@ -18,8 +18,8 @@ DIM startTime AS DOUBLE
 
 DIM moveSpeed AS DOUBLE
 DIM rotSpeed AS DOUBLE
-moveSpeed = 0.05
-rotSpeed# = 0.05
+moveSpeed = 0.01
+rotSpeed# = 0.01
 
 
 running = 1
@@ -189,12 +189,11 @@ WHILE running = 1
         planeY = oldPlaneX * SIN(rotSpeed) + planeY * COS(rotSpeed)
     END IF
 
-
     endTime# = TIMER(.001)
 
     frameTime# = endTime - startTime
     IF frameTime# < 1 / 60 THEN
-        SLEEP 1 / 60 - frameTime#
+        'SLEEP 1 / 60 - frameTime#
     END IF
 
 
@@ -231,19 +230,23 @@ SUB create_world (map_width AS INTEGER, map_height AS INTEGER, world() AS INTEGE
 END SUB
 
 FUNCTION read_key$
-    DIM keypress AS STRING
+    DIM S AS INTEGER
     DIM return_key AS STRING
+    S = 0
 
-    DO: keypress = INKEY$: LOOP UNTIL LEN(keypress)
+    'DO
+    '    S = INP(&H60)
+    'LOOP UNTIL LEN(S)
 
+    S = INP(&H60)
 
-    SELECT CASE keypress
-        CASE CHR$(0) + "H": return_key = "UP"
-        CASE CHR$(0) + "P": return_key = "DOWN"
-        CASE CHR$(0) + "K": return_key = "LEFT"
-        CASE CHR$(0) + "M": return_key = "RIGHT"
-        CASE "q", "Q", CHR$(27): SYSTEM
-        CASE ELSE: return_key = keypress
+    SELECT CASE S
+        CASE 72: return_key = "UP"
+        CASE 80: return_key = "DOWN"
+        CASE 75: return_key = "LEFT"
+        CASE 77: return_key = "RIGHT"
+        CASE 16, 1: SYSTEM
+        CASE ELSE: return_key = ""
     END SELECT
     read_key = return_key
 END FUNCTION
@@ -251,3 +254,5 @@ END FUNCTION
 SUB screen_setup (screen_width AS INTEGER, screen_height AS INTEGER)
     SCREEN 7, 0, 1, 0
 END SUB
+
+
