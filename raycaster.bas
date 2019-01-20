@@ -2,9 +2,13 @@ REM $DYNAMIC
 
 DECLARE create_world (width AS INTEGER, height AS INTEGER, world() AS INTEGER)
 DECLARE draw_vertical_line (x AS INTEGER, drawStart AS INTEGER, drawEnd AS INTEGER, screen_height AS INTEGER, colour AS INTEGER)
+DECLARE add_color (red AS INTEGER, green AS INTEGER, blue AS INTEGER)
+DECLARE load_palette
 
 DIM SHARED map_width AS INTEGER
 DIM SHARED map_height AS INTEGER
+DIM SHARED colorPalette(255) AS PaletteColor
+DIM SHARED nrOfColors AS INTEGER
 
 DIM posX AS DOUBLE
 DIM posY AS DOUBLE
@@ -18,9 +22,15 @@ DIM planeY AS DOUBLE
 DIM running AS INTEGER
 DIM startTime AS DOUBLE
 
+DIM textureWidth AS INTEGER
+DIM textureHeight AS INTEGER
+
+textureWidth = 32
+textureHeight = 32
+
 DIM moveSpeed AS DOUBLE
 DIM rotSpeed AS DOUBLE
-moveSpeed = 0.01
+moveSpeed = 0.05
 rotSpeed# = 0.01
 
 
@@ -30,8 +40,16 @@ startTime = TIMER
 screen_width = 320
 screen_height = 200
 
+DIM buffer(screen_height, screen_width) AS INTEGER
 DIM world(1, 1) AS INTEGER
+DIM texture1(32, 32) AS INTEGER
+DIM texture2(32, 32) AS INTEGER
 
+CALL screen_setup(screen_width, screen_height)
+CALL load_image("test.bmp", texture1())
+CALL load_image("test2.bmp", texture2())
+
+CALL load_palette
 
 posX = 3: posY = 3
 dirX = -1: dirY = 0
@@ -39,7 +57,7 @@ planeX = 0: planeY = 0.66
 
 'CALL create_world(24, 24, world())
 CALL load_map("map.txt", world())
-CALL screen_setup(screen_width, screen_height)
+
 
 WHILE running = 1
 
@@ -145,23 +163,86 @@ WHILE running = 1
             drawEnd = screen_height - 1
         END IF
 
-        DIM colour AS INTEGER
-        SELECT CASE world(mapX, mapY)
-            CASE 1
-                colour = 7
-            CASE ELSE
-                colour = 2
-        END SELECT
+        ' Texturing calculations
 
-        ' different brightness for x and y side
-        IF side = 1 THEN
-            colour = 8
+        DIM textureNr AS INTEGER
+        DIM wallX AS DOUBLE 'Where wall was hit
+        textureNr = world(mapX, mapY) - 1
+
+        IF side = 0 THEN
+            wallX = posY + perpWallDist * rayDirY
+        ELSE
+            wallX = posX + perpWallDist * rayDirX
         END IF
 
-        CALL draw_vertical_line(x, drawStart, drawEnd, screen_height, colour)
+        wallX = wallX - INT(wallX)
+
+        DIM texX AS INTEGER
+        DIM texY AS INTEGER
+        texX = INT(wallX * textureWidth)
+
+        IF side = 0 AND rayDir > 0 THEN
+            texX = textureWidth - texX - 1
+        END IF
+
+        IF side = 1 AND rayDirY < 0 THEN
+            texX = textureWidth - texX - 1
+        END IF
+
+        DIM colour AS INTEGER
+
+        FOR y = 0 TO drawStart - 1
+            buffer(y, x) = 3
+        NEXT
+
+        FOR y = drawStart TO screen_height - 1
+            buffer(y, x) = 4
+        NEXT
+
+
+        DIM height AS INTEGER
+        height = 32
+        IF lineHeight < 32 THEN
+            height = lineHeight
+        END IF
+
+        FOR y = drawStart TO drawEnd - 1
+            d% = y - screen_height * 0.5 + lineHeight * 0.5
+            texY = ((d% * textureHeight) / lineHeight)
+
+
+            IF textureNr = 0 THEN
+                colour = texture1(texX, texY)
+            ELSE
+                colour = texture2(texX, texY)
+            END IF
+
+            IF side = 1 THEN
+                colour = colour * 1.5
+            END IF
+            buffer(y, x) = colour
+        NEXT
+
+    NEXT
+
+    'CALL draw_buffer(buffer())
+    FOR x = 0 TO screen_width - 1
+        FOR y = 0 TO screen_height - 1
+            PSET (x, y), buffer(y, x)
+        NEXT
     NEXT
 
     PCOPY 1, 0
+
+    ' Clear buffer
+    FOR x = 0 TO screen_width - 1
+        FOR y = 0 TO screen_height - 1
+            buffer(y, x) = 0
+        NEXT
+    NEXT
+
+
+
 
     IF IS_PRESSED("UP") THEN
         posX = posX + dirX * moveSpeed
@@ -208,7 +289,7 @@ WHILE running = 1
         END IF
 
     LOOP
-    _MOUSEMOVE screen_width / 2, screen_height / 2 ' Lock mouse pointer to application by moving it to the middle of the screen
+    '_MOUSEMOVE screen_width / 2, screen_height / 2 ' Lock mouse pointer to application by moving it to the middle of the screen
 
     endTime# = TIMER(.001)
 
@@ -223,6 +304,16 @@ WHILE running = 1
     END IF
 
 WEND
+
+
+SUB draw_buffer (buffer() AS INTEGER)
+    FOR x = 0 TO screen_width - 1
+        FOR y = 0 TO screen_height - 1
+            'PSET (x, y), buffer(y, x)
+            PSET (x, y)
+        NEXT
+    NEXT
+END SUB
 
 
 SUB draw_vertical_line (x AS INTEGER, drawStart AS INTEGER, drawEnd AS INTEGER, screen_height AS INTEGER, colour AS INTEGER)
@@ -261,8 +352,9 @@ END SUB
 
 
 SUB screen_setup (screen_width AS INTEGER, screen_height AS INTEGER)
+    'SCREEN 0
     SCREEN 13, 0, 1, 0
-    _FULLSCREEN 'QB64 full screen mode, also works with alt+enter
+    '_FULLSCREEN 'QB64 full screen mode, also works with alt+enter
 END SUB
 
 
@@ -342,7 +434,6 @@ SUB load_map (filename AS STRING, world() AS INTEGER)
         LINE INPUT #1, text_line
         FOR letter = 1 TO map_width
             world(letter - 1, i) = VAL(MID$(text_line, letter, 1))
-            PRINT letter - 1, i, VAL(MID$(text_line, letter, 1))
         NEXT
     NEXT
 
@@ -370,7 +461,50 @@ TYPE BMPHeader 'BMP header also used in Icon and Cursor files(.ICO and .CUR)
     Yres AS LONG ' Depth in PELS per metre(normally 0)
     NumColors AS LONG ' Number of Colors(normally 0)
     SigColors AS LONG ' Significant Colors(normally 0)
+    Pal AS STRING * 1024 'Stored as &amp;lt;Blue, Green, Red, 0&amp;gt;
 END TYPE
+
+
+TYPE PaletteColor
+    Red AS INTEGER
+    Green AS INTEGER
+    Blue AS INTEGER
+END TYPE
+
+' Function that stores a color and returns the color code
+FUNCTION add_color (red AS INTEGER, green AS INTEGER, blue AS INTEGER)
+    DIM newColor AS PaletteColor
+    newColor.Red = red
+    newColor.Green = green
+    newColor.Blue = blue
+
+    colorCode% = 0
+    stored% = 0
+    FOR c = 0 TO nrOfColors - 1
+
+        IF colorPalette(c).Red = newColor.Red AND colorPalette(c).Green = newColor.Green AND colorPalette(c).Blue = newColor.Blue THEN
+            ' Color is already stored in palette
+            stored% = 1
+            colorCode% = c
+        END IF
+    NEXT
+
+    IF stored% = 0 THEN
+        colorPalette(nrOfColors) = newColor
+        colorCode% = nrOfColors
+        nrOfColors = nrOfColors + 1
+    END IF
+
+    add_color = colorCode%
+END SUB
+
+
+SUB load_palette
+    FOR c = 0 TO nrOfColors - 1
+        colorValue% = colorPalette(c).Red + (colorPalette(c).Green * 256) + (colorPalette(c).Blue * 65536)
+        PALETTE c, colorValue%
+    NEXT
+END SUB
 
 
 SUB load_image (filename AS STRING, imgdata() AS INTEGER)
@@ -385,15 +519,19 @@ SUB load_image (filename AS STRING, imgdata() AS INTEGER)
 
     ' Find out what this does
     ' Without this code the colors are incorrect
+    ' loads palette into memory, iamge palette is stored in BMP.pal
     a$ = " "
-    OUT &H3C8, 0 'start at attribute 0
+
+    colorOffset% = nrOfColors
+
+    SEEK #1, ENT.Offset + 1 - 1024
     FOR Colr = 0 TO 255
         GET #1, , a$: Blu = ASC(a$) \ 4
         GET #1, , a$: Grn = ASC(a$) \ 4
         GET #1, , a$: Red = ASC(a$) \ 4
-        OUT &H3C9, Red
-        OUT &H3C9, Grn
-        OUT &H3C9, Blu
+
+        colorCode% = add_color(Red, Grn, Blu)
+
         GET #1, , a$ '--- skip unused spacer byte
     NEXT Colr
 
@@ -403,7 +541,7 @@ SUB load_image (filename AS STRING, imgdata() AS INTEGER)
     FOR y = BMP.PDepth TO 0 STEP -1
         FOR x = 0 TO BMP.PWidth - 1
             GET #1, , byte$
-            imgdata(x, y) = ASC(byte$)
+            imgdata(x, y) = colorOffset% + ASC(byte$)
         NEXT
     NEXT
     CLOSE #1
