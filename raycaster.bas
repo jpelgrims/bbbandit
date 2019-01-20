@@ -261,7 +261,7 @@ END SUB
 
 
 SUB screen_setup (screen_width AS INTEGER, screen_height AS INTEGER)
-    SCREEN 7, 0, 1, 0
+    SCREEN 13, 0, 1, 0
     _FULLSCREEN 'QB64 full screen mode, also works with alt+enter
 END SUB
 
@@ -346,4 +346,65 @@ SUB load_map (filename AS STRING, world() AS INTEGER)
         NEXT
     NEXT
 
+END SUB
+
+
+TYPE BMPEntry ' Description
+    ID AS STRING * 2 ' File ID("BM" text or 19778 AS Integer)
+    Size AS LONG ' Total Size of the file
+    Res1 AS INTEGER ' Reserved 1 always
+    Res2 AS INTEGER ' Reserved 2 always
+    Offset AS LONG ' Start offset of image pixel data
+END TYPE
+
+
+TYPE BMPHeader 'BMP header also used in Icon and Cursor files(.ICO and .CUR)
+    Hsize AS LONG ' Info header size (always 40)
+    PWidth AS LONG ' Image width
+    PDepth AS LONG ' Image height (doubled in icons)
+    Planes AS INTEGER ' Number of planes (normally 1)
+    BPP AS INTEGER ' Bits per pixel(palette 1, 4, 8, 24)
+    Compression AS LONG ' Compression type(normally 0)
+    ImageBytes AS LONG ' (Width + padder) * Height
+    Xres AS LONG ' Width in PELS per metre(normally 0)
+    Yres AS LONG ' Depth in PELS per metre(normally 0)
+    NumColors AS LONG ' Number of Colors(normally 0)
+    SigColors AS LONG ' Significant Colors(normally 0)
+END TYPE
+
+
+SUB load_image (filename AS STRING, imgdata() AS INTEGER)
+    DIM ENT AS BMPEntry
+    DIM BMP AS BMPHeader
+
+    OPEN filename FOR BINARY AS #1
+    GET #1, 1, ENT
+    GET #1, , BMP
+
+    REDIM imgdata(BMP.PWidth, BMP.PDepth) AS INTEGER
+
+    ' Find out what this does
+    ' Without this code the colors are incorrect
+    a$ = " "
+    OUT &H3C8, 0 'start at attribute 0
+    FOR Colr = 0 TO 255
+        GET #1, , a$: Blu = ASC(a$) \ 4
+        GET #1, , a$: Grn = ASC(a$) \ 4
+        GET #1, , a$: Red = ASC(a$) \ 4
+        OUT &H3C9, Red
+        OUT &H3C9, Grn
+        OUT &H3C9, Blu
+        GET #1, , a$ '--- skip unused spacer byte
+    NEXT Colr
+
+    ' Read image data and store it in imgdata
+    SEEK #1, ENT.Offset + 1
+    byte$ = " "
+    FOR y = BMP.PDepth TO 0 STEP -1
+        FOR x = 0 TO BMP.PWidth - 1
+            GET #1, , byte$
+            imgdata(x, y) = ASC(byte$)
+        NEXT
+    NEXT
+    CLOSE #1
 END SUB
