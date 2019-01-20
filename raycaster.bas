@@ -155,6 +155,8 @@ WHILE running = 1
 
         IF drawStart < 0 THEN
             drawStart = 0
+        ELSEIF drawStart >= screen_height THEN
+            drawStart = screen_height-1
         END IF
 
         DIM drawEnd AS INTEGER
@@ -242,26 +244,34 @@ WHILE running = 1
     NEXT
 
 
-
+    DIM nextPosX AS DOUBLE
+    DIM nextPosY AS DOUBLE
+    nextPosX = posX
+    nextPosY = posY
 
     IF IS_PRESSED("UP") THEN
-        posX = posX + dirX * moveSpeed
-        posY = posY + dirY * moveSpeed
+        nextPosX = posX + dirX * moveSpeed
+        nextPosY = nextPosY + dirY * moveSpeed
     END IF
 
     IF IS_PRESSED("DOWN") THEN
-        posX = posX - dirX * moveSpeed
-        posY = posY - dirY * moveSpeed
+        nextPosX = nextPosX - dirX * moveSpeed
+        nextPosY = nextPosY - dirY * moveSpeed
     END IF
 
     IF IS_PRESSED("RIGHT") THEN
-        posX = posX + planeX * moveSpeed
-        posY = posY + planeY * moveSpeed
+        nextPosX = nextPosX + planeX * moveSpeed
+        nextPosY = nextPosY + planeY * moveSpeed
     END IF
 
     IF IS_PRESSED("LEFT") THEN
-        posX = posX - planeX * moveSpeed
-        posY = posY - planeY * moveSpeed
+        nextPosX = nextPosX - planeX * moveSpeed
+        nextPosY = nextPosY - planeY * moveSpeed
+    END IF
+
+    IF walkable(nextPosX, nextPosY, world()) = 1 THEN
+        posX = nextPosX
+        posY = nextPosY
     END IF
 
     IF IS_PRESSED("ESCAPE") OR IS_PRESSED("Q") THEN
@@ -314,6 +324,15 @@ SUB draw_buffer (buffer() AS INTEGER)
         NEXT
     NEXT
 END SUB
+
+
+FUNCTION walkable (x AS DOUBLE, y AS DOUBLE, world() AS INTEGER)
+    IF world(INT(x), INT(y)) = 0 THEN
+        walkable = 1
+    ELSE
+        walkable = 0
+    END IF
+END FUNCTION
 
 
 SUB draw_vertical_line (x AS INTEGER, drawStart AS INTEGER, drawEnd AS INTEGER, screen_height AS INTEGER, colour AS INTEGER)
