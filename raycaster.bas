@@ -7,8 +7,13 @@ DECLARE load_palette
 
 DIM SHARED map_width AS INTEGER
 DIM SHARED map_height AS INTEGER
-DIM SHARED colorPalette(255) AS PaletteColor
+DIM SHARED colorPalette(0 TO 256) AS PaletteColor
 DIM SHARED nrOfColors AS INTEGER
+nrOfColors = 0
+
+BLACK = add_color(0, 0, 0)
+DARK_GREY = add_color(10, 10, 10)
+LIGHT_GREY = add_color(20, 20, 20)
 
 DIM posX AS DOUBLE
 DIM posY AS DOUBLE
@@ -156,13 +161,15 @@ WHILE running = 1
         IF drawStart < 0 THEN
             drawStart = 0
         ELSEIF drawStart >= screen_height THEN
-            drawStart = screen_height-1
+            drawStart = screen_height - 1
         END IF
 
         DIM drawEnd AS INTEGER
         drawEnd = lineHeight / 2 + screen_height / 2
         IF drawEnd >= screen_height THEN
             drawEnd = screen_height - 1
+        ELSEIF drawEnd < 0 THEN
+            drawEnd = 0
         END IF
 
         ' Texturing calculations
@@ -193,12 +200,14 @@ WHILE running = 1
 
         DIM colour AS INTEGER
 
+        ' Draw ceiling color
         FOR y = 0 TO drawStart - 1
-            buffer(y, x) = 3
+            buffer(y, x) = DARK_GREY
         NEXT
 
-        FOR y = drawStart TO screen_height - 1
-            buffer(y, x) = 4
+        ' Draw floor color
+        FOR y = drawEnd TO screen_height - 1
+            buffer(y, x) = LIGHT_GREY
         NEXT
 
 
@@ -219,8 +228,9 @@ WHILE running = 1
                 colour = texture2(texX, texY)
             END IF
 
+            ' Make tesxture darker somehow
             IF side = 1 THEN
-                colour = colour * 1.5
+                colour = colour
             END IF
             buffer(y, x) = colour
         NEXT
@@ -492,6 +502,15 @@ END TYPE
 
 ' Function that stores a color and returns the color code
 FUNCTION add_color (red AS INTEGER, green AS INTEGER, blue AS INTEGER)
+
+    ' Check if palette is not full
+    IF nrOfColors = 256 THEN
+        PRINT "ERROR: The palette cannot contain more than 256 colors"
+        PCOPY 1, 0
+        SLEEP
+        SYSTEM
+    END IF
+
     DIM newColor AS PaletteColor
     newColor.Red = red
     newColor.Green = green
@@ -517,11 +536,15 @@ FUNCTION add_color (red AS INTEGER, green AS INTEGER, blue AS INTEGER)
     add_color = colorCode%
 END SUB
 
-
 SUB load_palette
     FOR c = 0 TO nrOfColors - 1
-        colorValue% = colorPalette(c).Red + (colorPalette(c).Green * 256) + (colorPalette(c).Blue * 65536)
-        PALETTE c, colorValue%
+        'colorValue% = colorPalette(c).Red + (colorPalette(c).Green * 256) + (colorPalette(c).Blue * 65536)
+        'PALETTE c + 1, colorValue%
+        OUT &H3C8, c ' color palette nr
+        OUT &H3C9, colorPalette(c).Red ' red
+        OUT &H3C9, colorPalette(c).Green ' green
+        OUT &H3C9, colorPalette(c).Blue ' blue
+        OUT &H3C7, 0
     NEXT
 END SUB
 
@@ -543,13 +566,20 @@ SUB load_image (filename AS STRING, imgdata() AS INTEGER)
 
     colorOffset% = nrOfColors
 
+    ' Colors are stored in biutmap starting from 0
+    ' Need a mapping from bitmap color nr to palette color nr
+    DIM bitmapToPalette(0 TO 256) AS INTEGER
+
     SEEK #1, ENT.Offset + 1 - 1024
-    FOR Colr = 0 TO 255
+    FOR Colr = 0 TO 256
         GET #1, , a$: Blu = ASC(a$) \ 4
         GET #1, , a$: Grn = ASC(a$) \ 4
         GET #1, , a$: Red = ASC(a$) \ 4
 
         colorCode% = add_color(Red, Grn, Blu)
+
+        ' Store mapping
+        bitmapToPalette(Colr) = colorCode%
 
         GET #1, , a$ '--- skip unused spacer byte
     NEXT Colr
@@ -559,8 +589,10 @@ SUB load_image (filename AS STRING, imgdata() AS INTEGER)
     byte$ = " "
     FOR y = BMP.PDepth TO 0 STEP -1
         FOR x = 0 TO BMP.PWidth - 1
+            ' byte$ contains bitmap color nr
+            ' use bitmapToPalette mapping to convert to palette color nr
             GET #1, , byte$
-            imgdata(x, y) = colorOffset% + ASC(byte$)
+            imgdata(x, y) = bitmapToPalette(ASC(byte$))
         NEXT
     NEXT
     CLOSE #1
