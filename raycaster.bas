@@ -172,7 +172,7 @@ WHILE running = 1
             drawEnd = 0
         END IF
 
-        ' Texturing calculations
+        'Wall Texturing calculations
 
         DIM textureNr AS INTEGER
         DIM wallX AS DOUBLE 'Where wall was hit
@@ -200,17 +200,6 @@ WHILE running = 1
 
         DIM colour AS INTEGER
 
-        ' Draw ceiling color
-        FOR y = 0 TO drawStart - 1
-            buffer(y, x) = DARK_GREY
-        NEXT
-
-        ' Draw floor color
-        FOR y = drawEnd TO screen_height - 1
-            buffer(y, x) = LIGHT_GREY
-        NEXT
-
-
         DIM height AS INTEGER
         height = 32
         IF lineHeight < 32 THEN
@@ -234,6 +223,66 @@ WHILE running = 1
             END IF
             buffer(y, x) = colour
         NEXT
+
+        ' Draw ceiling color
+        FOR y = 0 TO drawStart - 1
+            buffer(y, x) = DARK_GREY
+        NEXT
+
+        ' Draw floor color
+        FOR y = drawEnd TO screen_height - 1
+            buffer(y, x) = LIGHT_GREY
+        NEXT
+
+        ' Floor casting
+
+        DIM floorXWall AS DOUBLE
+        DIM floorYWall AS DOUBLE
+
+        IF (side = 0 AND rayDirX < 0) THEN
+            floorXWall = mapX
+            floorYWall = mapY + wallX
+        ELSEIF (side = 0 AND rayDirX < 0) THEN
+            floorXWall = mapX + 1
+            floorYWall = mapY + wallX
+        ELSEIF (side = 1 AND rayDirX < 0) THEN
+            floorXWall = mapX + wallX
+            floorYWall = mapY
+        ELSE
+            floorXWall = mapX + wallX
+            floorYWall = mapY + 1
+        END IF
+
+        DIM distWall, distPlayer, currentDist, weight AS DOUBLE
+        DIM currentFloorX, currentFloorY AS DOUBLE
+        DIM floorTexX, floorTexY AS INTEGER
+
+        distWall = perpWallDist
+        distPlayer = 0.0
+
+        IF (drawEnd < 0) THEN
+            drawEnd = screen_height
+        END IF
+
+        FOR y = drawEnd + 1 TO screen_height
+            currentDist = screen_height / (2.0 * y - screen_height) 'make lookup table
+
+            weight = (currentDist - distPlayer) / (distWall - distPlayer)
+
+            currentFloorX = weight * floorXWall + (1 - weight) * posX
+            currentFloorY = weight * floorYWall + (1 - weight) * posY
+
+            floorTexX = INT(currentFloorX * textureWidth) MOD textureWidth
+            floorTexY = INT(currentFloorY * textureHeight) MOD textureHeight
+
+
+            ' floor
+            buffer(y, x) = texture1(floorTexX, floorTexY)
+
+            ' ceiling
+            buffer(screen_height - y, x) = texture1(floorTexX, floorTexY)
+        NEXT
+
 
     NEXT
 
@@ -597,3 +646,10 @@ SUB load_image (filename AS STRING, imgdata() AS INTEGER)
     NEXT
     CLOSE #1
 END SUB
+
+FUNCTION SHIFT% (var%, numshifts%)
+    mulval% = 2 ^ numshifts%
+    var% = var% * mulval%
+    SHIFT% = var%
+END FUNCTION
+
