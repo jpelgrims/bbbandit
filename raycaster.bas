@@ -132,7 +132,7 @@ WHILE running = 1
             END IF
         WEND
 
-        ' Calculate distance of perpendicualr ray (no euclidean distance to avoid fisheye effect)
+        ' Calculate distance of perpendicular ray (no euclidean distance to avoid fisheye effect)
         IF side = 0 THEN
             perpWallDist = (mapX - posX + (1 - stepX) / 2) / rayDirX
         ELSE
@@ -211,20 +211,9 @@ WHILE running = 1
             buffer(y, x) = colour
         NEXT
 
-        ' Draw ceiling color
-        FOR y = 0 TO drawStart - 1
-            buffer(y, x) = DARK_GREY
-        NEXT
+        ' Floor & ceiling casting
 
-        ' Draw floor color
-        FOR y = drawEnd TO screen_height - 1
-            buffer(y, x) = LIGHT_GREY
-        NEXT
-
-        ' Floor casting
-
-        DIM floorXWall AS DOUBLE
-        DIM floorYWall AS DOUBLE
+        DIM floorXWall, floorYWall AS DOUBLE
 
         IF (side = 0 AND rayDirX > 0) THEN
             floorXWall = mapX
@@ -240,28 +229,31 @@ WHILE running = 1
             floorYWall = mapY + 1
         END IF
 
-        DIM distWall, distPlayer, currentDist, weight AS DOUBLE
+        DIM distWall, currentDist, weight AS DOUBLE
         DIM currentFloorX, currentFloorY AS DOUBLE
         DIM floorTexX, floorTexY AS INTEGER
 
         distWall = perpWallDist
-        distPlayer = 0.0
 
         IF (drawEnd < 0) THEN
             drawEnd = screen_height
         END IF
 
-        FOR y = drawEnd + 1 TO screen_height
+        FOR y = drawEnd + 1 TO screen_height - 1
             currentDist = screen_height / (2.0 * y - screen_height) 'make lookup table
 
-            weight = (currentDist - distPlayer) / (distWall - distPlayer)
+            weight = currentDist / distWall
 
-            currentFloorX = weight * floorXWall + (1 - weight) * posX
-            currentFloorY = weight * floorYWall + (1 - weight) * posY
+            currentFloorX = weight * floorXWall + (1.0 - weight) * posX
+            currentFloorY = weight * floorYWall + (1.0 - weight) * posY
 
             floorTexX = INT(currentFloorX * textureWidth) MOD textureWidth
             floorTexY = INT(currentFloorY * textureHeight) MOD textureHeight
 
+            'PRINT x, y
+            'PRINT floorTexX, floorTexY
+            'PCOPY 1, 0
+            'PRINT
 
             ' floor
             buffer(y, x) = tilesheet(4, floorTexX, floorTexY)
@@ -372,11 +364,19 @@ END SUB
 
 
 FUNCTION walkable (x AS DOUBLE, y AS DOUBLE, world() AS INTEGER)
-    IF world(INT(x), INT(y)) = 0 THEN
-        walkable = 1
-    ELSE
+    walkable = 1
+    wallHitDist = 0.1
+
+    IF world(INT(x + wallHitDist), INT(y + wallHitDist)) <> 0 THEN
+        walkable = 0
+    ELSEIF world(INT(x - wallHitDist), INT(y - wallHitDist)) <> 0 THEN
+        walkable = 0
+    ELSEIF world(INT(x + wallHitDist), INT(y - wallHitDist)) <> 0 THEN
+        walkable = 0
+    ELSEIF world(INT(x - wallHitDist), INT(y + wallHitDist)) <> 0 THEN
         walkable = 0
     END IF
+
 END FUNCTION
 
 
@@ -598,7 +598,7 @@ SUB load_tilesheet (filename AS STRING, tilesize AS INTEGER, tilesheet() AS INTE
     DIM sheetWidth, sheetHeight AS INTEGER
     sheetWidth = BMP.PWidth / tilesize
     sheetHeight = BMP.PDepth / tilesize
-    REDIM tilesheet(nrOfTiles%, tilesize, tilesize) AS INTEGER
+    REDIM tilesheet(nrOfTiles%, 0 TO tilesize, 0 TO tilesize) AS INTEGER
 
     FOR y = 0 TO sheetHeight - 1
         FOR x = 0 TO sheetWidth - 1
@@ -610,6 +610,9 @@ SUB load_tilesheet (filename AS STRING, tilesize AS INTEGER, tilesheet() AS INTE
             NEXT
         NEXT
     NEXT
+
+    testx% = tilesheet(4, 0, 0)
+    testx% = tilesheet(5, 0, 0)
 
 END SUB
 
