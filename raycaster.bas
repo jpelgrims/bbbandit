@@ -5,36 +5,28 @@ DECLARE draw_vertical_line (x AS INTEGER, drawStart AS INTEGER, drawEnd AS INTEG
 DECLARE add_color (red AS INTEGER, green AS INTEGER, blue AS INTEGER)
 DECLARE load_palette
 
-DIM SHARED map_width AS INTEGER
-DIM SHARED map_height AS INTEGER
-DIM SHARED colorPalette(0 TO 256) AS PaletteColor
+DIM SHARED map_width, map_height AS INTEGER
+DIM SHARED colorPalette(0 TO 512) AS PaletteColor
 DIM SHARED nrOfColors AS INTEGER
 nrOfColors = 0
 
-BLACK = add_color(0, 0, 0)
-DARK_GREY = add_color(10, 10, 10)
-LIGHT_GREY = add_color(20, 20, 20)
+'BLACK = add_color(0, 0, 0)
+'DARK_GREY = add_color(10, 10, 10)
+'LIGHT_GREY = add_color(20, 20, 20)
 
-DIM posX AS DOUBLE
-DIM posY AS DOUBLE
-
-DIM dirX AS DOUBLE
-DIM dirY AS DOUBLE
-
-DIM planeX AS DOUBLE
-DIM planeY AS DOUBLE
+DIM posX, posY AS DOUBLE
+DIM dirX, dirY AS DOUBLE
+DIM planeX, planeY AS DOUBLE
 
 DIM running AS INTEGER
 DIM startTime AS DOUBLE
 
-DIM textureWidth AS INTEGER
-DIM textureHeight AS INTEGER
+DIM textureWidth, textureHeight AS INTEGER
 
 textureWidth = 32
 textureHeight = 32
 
-DIM moveSpeed AS DOUBLE
-DIM rotSpeed AS DOUBLE
+DIM moveSpeed, rotSpeed AS DOUBLE
 moveSpeed = 0.05
 rotSpeed# = 0.01
 
@@ -47,12 +39,11 @@ screen_height = 200
 
 DIM buffer(screen_height, screen_width) AS INTEGER
 DIM world(1, 1) AS INTEGER
-DIM texture1(32, 32) AS INTEGER
-DIM texture2(32, 32) AS INTEGER
+DIM tilesheet(1, 1, 1) AS INTEGER
+
 
 CALL screen_setup(screen_width, screen_height)
-CALL load_image("test.bmp", texture1())
-CALL load_image("test2.bmp", texture2())
+CALL load_tilesheet("tilesheet.bmp", 32, tilesheet())
 
 CALL load_palette
 
@@ -176,7 +167,7 @@ WHILE running = 1
 
         DIM textureNr AS INTEGER
         DIM wallX AS DOUBLE 'Where wall was hit
-        textureNr = world(mapX, mapY) - 1
+        textureNr = world(mapX, mapY)
 
         IF side = 0 THEN
             wallX = posY + perpWallDist * rayDirY
@@ -211,15 +202,11 @@ WHILE running = 1
             texY = ((d% * textureHeight) / lineHeight)
 
 
-            IF textureNr = 0 THEN
-                colour = texture1(texX, texY)
-            ELSE
-                colour = texture2(texX, texY)
-            END IF
+            colour = tilesheet(textureNr, texX, texY)
 
             ' Make tesxture darker somehow
             IF side = 1 THEN
-                colour = colour
+                colour = tilesheet(textureNr + 1, texX, texY)
             END IF
             buffer(y, x) = colour
         NEXT
@@ -239,13 +226,13 @@ WHILE running = 1
         DIM floorXWall AS DOUBLE
         DIM floorYWall AS DOUBLE
 
-        IF (side = 0 AND rayDirX < 0) THEN
+        IF (side = 0 AND rayDirX > 0) THEN
             floorXWall = mapX
             floorYWall = mapY + wallX
         ELSEIF (side = 0 AND rayDirX < 0) THEN
             floorXWall = mapX + 1
             floorYWall = mapY + wallX
-        ELSEIF (side = 1 AND rayDirX < 0) THEN
+        ELSEIF (side = 1 AND rayDirY > 0) THEN
             floorXWall = mapX + wallX
             floorYWall = mapY
         ELSE
@@ -277,12 +264,11 @@ WHILE running = 1
 
 
             ' floor
-            buffer(y, x) = texture1(floorTexX, floorTexY)
+            buffer(y, x) = tilesheet(4, floorTexX, floorTexY)
 
             ' ceiling
-            buffer(screen_height - y, x) = texture1(floorTexX, floorTexY)
+            buffer(screen_height - y, x) = tilesheet(5, floorTexX, floorTexY)
         NEXT
-
 
     NEXT
 
@@ -559,28 +545,26 @@ FUNCTION add_color (red AS INTEGER, green AS INTEGER, blue AS INTEGER)
         SLEEP
         SYSTEM
     END IF
-
-    DIM newColor AS PaletteColor
-    newColor.Red = red
-    newColor.Green = green
-    newColor.Blue = blue
-
     colorCode% = 0
     stored% = 0
     FOR c = 0 TO nrOfColors - 1
 
-        IF colorPalette(c).Red = newColor.Red AND colorPalette(c).Green = newColor.Green AND colorPalette(c).Blue = newColor.Blue THEN
+        IF colorPalette(c).Red = red AND colorPalette(c).Green = green AND colorPalette(c).Blue = blue THEN
             ' Color is already stored in palette
             stored% = 1
             colorCode% = c
+            EXIT FOR
         END IF
     NEXT
 
     IF stored% = 0 THEN
-        colorPalette(nrOfColors) = newColor
+        colorPalette(nrOfColors).Red = red
+        colorPalette(nrOfColors).Blue = blue
+        colorPalette(nrOfColors).Green = green
         colorCode% = nrOfColors
         nrOfColors = nrOfColors + 1
     END IF
+
 
     add_color = colorCode%
 END SUB
@@ -597,6 +581,38 @@ SUB load_palette
     NEXT
 END SUB
 
+SUB load_tilesheet (filename AS STRING, tilesize AS INTEGER, tilesheet() AS INTEGER)
+    DIM tiledata(1, 1) AS INTEGER
+    CALL load_image(filename, tiledata())
+
+    DIM ENT AS BMPEntry
+    DIM BMP AS BMPHeader
+
+    OPEN filename FOR BINARY AS #1
+    GET #1, 1, ENT
+    GET #1, , BMP
+    CLOSE #1
+
+    nrOfTiles% = (BMP.PWidth / tilesize) * (BMP.PDepth / tilesize)
+
+    DIM sheetWidth, sheetHeight AS INTEGER
+    sheetWidth = BMP.PWidth / tilesize
+    sheetHeight = BMP.PDepth / tilesize
+    REDIM tilesheet(nrOfTiles%, tilesize, tilesize) AS INTEGER
+
+    FOR y = 0 TO sheetHeight - 1
+        FOR x = 0 TO sheetWidth - 1
+            tileNr% = x + (sheetWidth * y)
+            FOR i = 0 TO tilesize - 1
+                FOR j = 0 TO tilesize - 1
+                    tilesheet(tileNr%, j, i) = tiledata(j + (tilesize * x), i + (tilesize * y))
+                NEXT
+            NEXT
+        NEXT
+    NEXT
+
+END SUB
+
 
 SUB load_image (filename AS STRING, imgdata() AS INTEGER)
     DIM ENT AS BMPEntry
@@ -605,6 +621,7 @@ SUB load_image (filename AS STRING, imgdata() AS INTEGER)
     OPEN filename FOR BINARY AS #1
     GET #1, 1, ENT
     GET #1, , BMP
+
 
     REDIM imgdata(BMP.PWidth, BMP.PDepth) AS INTEGER
 
@@ -617,10 +634,10 @@ SUB load_image (filename AS STRING, imgdata() AS INTEGER)
 
     ' Colors are stored in biutmap starting from 0
     ' Need a mapping from bitmap color nr to palette color nr
-    DIM bitmapToPalette(0 TO 256) AS INTEGER
+    DIM bitmapToPalette(0 TO BMP.NumColors) AS INTEGER
 
     SEEK #1, ENT.Offset + 1 - 1024
-    FOR Colr = 0 TO 256
+    FOR Colr = 0 TO BMP.NumColors
         GET #1, , a$: Blu = ASC(a$) \ 4
         GET #1, , a$: Grn = ASC(a$) \ 4
         GET #1, , a$: Red = ASC(a$) \ 4
