@@ -43,9 +43,11 @@ DIM tilesheet(1, 1, 1) AS INTEGER
 
 
 CALL screen_setup(screen_width, screen_height)
+
+CALL set_palette
 CALL load_tilesheet("tilesheet.bmp", 32, tilesheet())
 
-CALL load_palette
+'CALL load_palette
 
 posX = 3: posY = 3
 dirX = -1: dirY = 0
@@ -62,8 +64,7 @@ WAIT &H3DA, 8, 8
 
 DIM zBuffer(0 TO screen_width) AS INTEGER
 
-'CALL shift_palette(0, 35, 0)
-CALL set_palette
+'CALL shift_palette(0, 0, 0)
 
 WHILE running = 1
 
@@ -560,6 +561,10 @@ END TYPE
 ' Function that stores a color and returns the color code
 FUNCTION add_color (red AS INTEGER, green AS INTEGER, blue AS INTEGER)
 
+    red = INT(red / 4)
+    green = INT(green / 4)
+    blue = INT(blue / 4)
+
     ' Check if palette is not full
     IF nrOfColors = 256 THEN
         PRINT "ERROR: The palette cannot contain more than 256 colors"
@@ -655,8 +660,6 @@ SUB load_image (filename AS STRING, imgdata() AS INTEGER)
     ' loads palette into memory, iamge palette is stored in BMP.pal
     a$ = " "
 
-    colorOffset% = nrOfColors
-
     ' Colors are stored in biutmap starting from 0
     ' Need a mapping from bitmap color nr to palette color nr
     DIM bitmapToPalette(0 TO BMP.NumColors) AS INTEGER
@@ -667,7 +670,12 @@ SUB load_image (filename AS STRING, imgdata() AS INTEGER)
         GET #1, , a$: Grn = ASC(a$) \ 4
         GET #1, , a$: Red = ASC(a$) \ 4
 
-        colorCode% = add_color(Red, Grn, Blu)
+        'colorCode% = add_color(Red, Grn, Blu)
+        colorCode% = rgb_to_palette(Red, Grn, Blu)
+        'PRINT Red, Grn, Blu
+        'PRINT colorCode%
+        'PCOPY 1, 0
+        'SLEEP
 
         ' Store mapping
         bitmapToPalette(Colr) = colorCode%
@@ -701,7 +709,7 @@ END FUNCTION
 
 FUNCTION rgb_to_palette% (red AS INTEGER, green AS INTEGER, blue AS INTEGER)
     paletteNr% = 0
-    smallestDiff& = 10000
+    smallestDiff& = 1000000
 
     FOR i = 0 TO nrOfColors
         diff& = SQR((red - colorPalette(i).Red) ^ 2 + (green - colorPalette(i).Green) ^ 2 + (blue - colorPalette(i).Blue) ^ 2)
@@ -710,6 +718,8 @@ FUNCTION rgb_to_palette% (red AS INTEGER, green AS INTEGER, blue AS INTEGER)
             paletteNr% = i
         END IF
     NEXT
+
+
 
     rgb_to_palette = paletteNr%
 END FUNCTION
@@ -721,11 +731,34 @@ SUB set_palette_color (index AS INTEGER, red AS INTEGER, green AS INTEGER, blue 
 END SUB
 
 SUB set_palette
-    FOR i = 0 TO 63
-        CALL set_palette_color(64 + i, i, 0, 0)
-        CALL set_palette_color(128 + i, 0, i, 0)
-        CALL set_palette_color(192 + i, 0, 0, i)
+    DIM s AS INTEGER
+    FOR i = 0 TO 16
+        s = 64 / 16
+        CALL set_palette_color(0 + i, i * s, i * s, i * s) ' Greyscale
+
+        CALL set_palette_color(16 + i, i * s, 0, 0) ' Red
+        CALL set_palette_color(32 + i, 0, i * s, 0) 'Green
+        CALL set_palette_color(48 + i, 0, 0, i * s) ' Blue
+
+        CALL set_palette_color(64 + i, 0, i * s, i * s) ' Teal?
+        CALL set_palette_color(80 + i, i * s, 0, i * s) ' Purple
+        CALL set_palette_color(96 + i, i * s, i * s, 0) ' Teal?
+
+        CALL set_palette_color(128 + i, 0, i * s / 2, i * s)
+        CALL set_palette_color(144 + i, 0, i * s, i * s / 2)
+
+        CALL set_palette_color(160 + i, i * s / 2, i * s, 0)
+        CALL set_palette_color(176 + i, i * s, i * s / 2, 0)
+
+        CALL set_palette_color(192 + i, i * s / 2, 0, i * s)
+        CALL set_palette_color(208 + i, i * s, 0, i * s / 2)
+
+        CALL set_palette_color(224 + i, i * s / 2, i * s, i * s)
+        CALL set_palette_color(240 + i, i * s, i * s / 2, i * s)
+
     NEXT
+
+    nrOfColors = 255
     CALL load_palette
 END SUB
 
@@ -735,16 +768,16 @@ SUB shift_palette (red AS INTEGER, green AS INTEGER, blue AS INTEGER)
         colorPalette(c).Green = colorPalette(c).Green + green
         colorPalette(c).Blue = colorPalette(c).Blue + blue
 
-        IF colorPalette(c).Red >= 256 THEN
-            colorPalette(c).Red = 255
+        IF colorPalette(c).Red >= 64 THEN
+            colorPalette(c).Red = 63
         END IF
 
-        IF colorPalette(c).Green >= 256 THEN
-            colorPalette(c).Green = 255
+        IF colorPalette(c).Green >= 64 THEN
+            colorPalette(c).Green = 63
         END IF
 
-        IF colorPalette(c).Blue >= 256 THEN
-            colorPalette(c).Blue = 255
+        IF colorPalette(c).Blue >= 64 THEN
+            colorPalette(c).Blue = 63
         END IF
 
     NEXT
