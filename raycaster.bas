@@ -54,8 +54,20 @@ planeX = 0: planeY = 0.66
 'CALL create_world(24, 24, world())
 CALL load_map("map.txt", world())
 
+' Avoid flickering with fast pset by waiting until screen fully drawn
+WAIT &H3DA, 8
+WAIT &H3DA, 8, 8
+
+
+
+DIM zBuffer(0 TO screen_width) AS INTEGER
+
+'CALL shift_palette(0, 35, 0)
+CALL set_palette
 
 WHILE running = 1
+
+
 
     FOR x = 0 TO screen_width - 1
         DIM cameraX AS DOUBLE
@@ -211,6 +223,9 @@ WHILE running = 1
             buffer(y, x) = colour
         NEXT
 
+        ' zbuffer for sprite casting
+        zBuffer(x) = perpWallDist
+
         ' Floor & ceiling casting
 
         DIM floorXWall, floorYWall AS DOUBLE
@@ -244,16 +259,13 @@ WHILE running = 1
 
             weight = currentDist / distWall
 
+            ' tile coordinates
             currentFloorX = weight * floorXWall + (1.0 - weight) * posX
             currentFloorY = weight * floorYWall + (1.0 - weight) * posY
 
+            ' pixel coordinates for texture
             floorTexX = INT(currentFloorX * textureWidth) MOD textureWidth
             floorTexY = INT(currentFloorY * textureHeight) MOD textureHeight
-
-            'PRINT x, y
-            'PRINT floorTexX, floorTexY
-            'PCOPY 1, 0
-            'PRINT
 
             ' floor
             buffer(y, x) = tilesheet(4, floorTexX, floorTexY)
@@ -267,11 +279,21 @@ WHILE running = 1
     'CALL draw_buffer(buffer())
     FOR x = 0 TO screen_width - 1
         FOR y = 0 TO screen_height - 1
-            PSET (x, y), buffer(y, x)
+            ' Reduce flickering
+
+
+            ' Fast PSET
+            DEF SEG = &HA000
+            POKE y * 320& + x, buffer(y, x)
+            DEF SEG
+
+
+
+            'PSET (x, y), buffer(y, x)
         NEXT
     NEXT
 
-    PCOPY 1, 0
+    'PCOPY 1, 0
 
     ' Clear buffer
     FOR x = 0 TO screen_width - 1
@@ -572,7 +594,7 @@ END SUB
 SUB load_palette
     FOR c = 0 TO nrOfColors - 1
         'colorValue% = colorPalette(c).Red + (colorPalette(c).Green * 256) + (colorPalette(c).Blue * 65536)
-        'PALETTE c + 1, colorValue%
+        'PALETTE c + 1, colorValue%  ' is slow
         OUT &H3C8, c ' color palette nr
         OUT &H3C9, colorPalette(c).Red ' red
         OUT &H3C9, colorPalette(c).Green ' green
@@ -673,3 +695,58 @@ FUNCTION SHIFT% (var%, numshifts%)
     SHIFT% = var%
 END FUNCTION
 
+FUNCTION color_blend ()
+END FUNCTION
+
+
+FUNCTION rgb_to_palette% (red AS INTEGER, green AS INTEGER, blue AS INTEGER)
+    paletteNr% = 0
+    smallestDiff& = 10000
+
+    FOR i = 0 TO nrOfColors
+        diff& = SQR((red - colorPalette(i).Red) ^ 2 + (green - colorPalette(i).Green) ^ 2 + (blue - colorPalette(i).Blue) ^ 2)
+        IF diff& < smallestDiff& THEN
+            smallestDiff& = diff&
+            paletteNr% = i
+        END IF
+    NEXT
+
+    rgb_to_palette = paletteNr%
+END FUNCTION
+
+SUB set_palette_color (index AS INTEGER, red AS INTEGER, green AS INTEGER, blue AS INTEGER)
+    colorPalette(index).Red = red
+    colorPalette(index).Green = green
+    colorPalette(index).Blue = blue
+END SUB
+
+SUB set_palette
+    FOR i = 0 TO 63
+        CALL set_palette_color(64 + i, i, 0, 0)
+        CALL set_palette_color(128 + i, 0, i, 0)
+        CALL set_palette_color(192 + i, 0, 0, i)
+    NEXT
+    CALL load_palette
+END SUB
+
+SUB shift_palette (red AS INTEGER, green AS INTEGER, blue AS INTEGER)
+    FOR c = 0 TO nrOfColors - 1
+        colorPalette(c).Red = colorPalette(c).Red + red
+        colorPalette(c).Green = colorPalette(c).Green + green
+        colorPalette(c).Blue = colorPalette(c).Blue + blue
+
+        IF colorPalette(c).Red >= 256 THEN
+            colorPalette(c).Red = 255
+        END IF
+
+        IF colorPalette(c).Green >= 256 THEN
+            colorPalette(c).Green = 255
+        END IF
+
+        IF colorPalette(c).Blue >= 256 THEN
+            colorPalette(c).Blue = 255
+        END IF
+
+    NEXT
+    CALL load_palette
+END SUB
