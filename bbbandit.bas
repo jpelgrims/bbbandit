@@ -41,13 +41,23 @@ DIM buffer(screen_height, screen_width) AS INTEGER
 DIM world(1, 1) AS INTEGER
 DIM tilesheet(1, 1, 1) AS INTEGER
 
+_TITLE "Basic Battle Bandit 3D"
+PRINT "BASIC BATTLE BANDIT 3D"
+PRINT ""
+PRINT "Press any key to start..."
+SLEEP
 
 CALL screen_setup(screen_width, screen_height)
+
+' Show console for debugging purposes
+$CONSOLE
 
 CALL set_palette
 CALL load_tilesheet("tilesheet.bmp", 32, tilesheet())
 
 'CALL load_palette
+
+log ("testing")
 
 posX = 3: posY = 3
 dirX = -1: dirY = 0
@@ -59,7 +69,6 @@ CALL load_map("map.txt", world())
 ' Avoid flickering with fast pset by waiting until screen fully drawn
 WAIT &H3DA, 8
 WAIT &H3DA, 8, 8
-
 
 
 DIM zBuffer(0 TO screen_width) AS INTEGER
@@ -160,7 +169,7 @@ WHILE running = 1
         ' Calculate lowest and highest pixel to fill in current stripe
         DIM drawStart AS INTEGER
 
-        drawStart = -lineHeight / 2 + screen_height / 2
+        drawStart = -lineHeight / 2 + (screen_height / 2)
 
         IF drawStart < 0 THEN
             drawStart = 0
@@ -169,7 +178,7 @@ WHILE running = 1
         END IF
 
         DIM drawEnd AS INTEGER
-        drawEnd = lineHeight / 2 + screen_height / 2
+        drawEnd = lineHeight / 2 + (screen_height / 2)
         IF drawEnd >= screen_height THEN
             drawEnd = screen_height - 1
         ELSEIF drawEnd < 0 THEN
@@ -342,6 +351,7 @@ WHILE running = 1
     _MOUSEHIDE
     DO WHILE _MOUSEINPUT
         m = 4
+
         IF _MOUSEMOVEMENTX < 0 THEN
             oldDirX = dirX
             dirX = dirX * COS(rotSpeed * m) - dirY * SIN(rotSpeed * m)
@@ -782,4 +792,10 @@ SUB shift_palette (red AS INTEGER, green AS INTEGER, blue AS INTEGER)
 
     NEXT
     CALL load_palette
+END SUB
+
+SUB log (message AS STRING)
+    _DEST _CONSOLE
+    PRINT message
+    _DEST 0
 END SUB
