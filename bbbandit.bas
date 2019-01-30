@@ -6,9 +6,10 @@ DECLARE add_color (red AS INTEGER, green AS INTEGER, blue AS INTEGER)
 DECLARE load_palette
 
 DIM SHARED map_width, map_height AS INTEGER
-DIM SHARED colorPalette(0 TO 512) AS PaletteColor
+DIM SHARED colorPalette(0 TO 256) AS PaletteColor
 DIM SHARED nrOfColors AS INTEGER
 nrOfColors = 0
+
 
 'BLACK = add_color(0, 0, 0)
 'DARK_GREY = add_color(10, 10, 10)
@@ -34,6 +35,8 @@ rotSpeed# = 0.01
 running = 1
 startTime = TIMER
 
+DIM SHARED screen_width, screen_height AS INTEGER
+
 screen_width = 320
 screen_height = 200
 
@@ -42,29 +45,36 @@ DIM world(1, 1) AS INTEGER
 DIM tilesheet(1, 1, 1) AS INTEGER
 
 _TITLE "Basic Battle Bandit 3D"
-PRINT "BASIC BATTLE BANDIT 3D"
-PRINT ""
-PRINT "Press any key to start..."
-SLEEP
 
 CALL screen_setup(screen_width, screen_height)
 
 ' Show console for debugging purposes
 $CONSOLE
 
-CALL set_palette
+'CALL set_palette
 CALL load_tilesheet("tilesheet.bmp", 32, tilesheet())
 
-'CALL load_palette
+DIM show_title_flag AS INTEGER
+show_title_flag = TIMER(0.01)
+DIM titlescreen(1, 1) AS INTEGER
+CALL load_image("titlescreen.bmp", titlescreen())
+
+
+CALL load_palette
 
 log ("testing")
 
-posX = 3: posY = 3
+posX = 12: posY = 3
 dirX = -1: dirY = 0
 planeX = 0: planeY = 0.66
 
 'CALL create_world(24, 24, world())
 CALL load_map("map.txt", world())
+
+
+CALL draw_titlescreen(buffer(), titlescreen())
+CALL draw_buffer(buffer())
+SLEEP
 
 ' Avoid flickering with fast pset by waiting until screen fully drawn
 WAIT &H3DA, 8
@@ -230,7 +240,7 @@ WHILE running = 1
             IF side = 1 THEN
                 colour = tilesheet(textureNr + 1, texX, texY)
             END IF
-            buffer(y, x) = colour
+            buffer(y + 1, x) = colour
         NEXT
 
         ' zbuffer for sprite casting
@@ -278,30 +288,19 @@ WHILE running = 1
             floorTexY = INT(currentFloorY * textureHeight) MOD textureHeight
 
             ' floor
-            buffer(y, x) = tilesheet(4, floorTexX, floorTexY)
+            buffer(y, x) = tilesheet(2, floorTexX, floorTexY)
 
             ' ceiling
-            buffer(screen_height - y, x) = tilesheet(5, floorTexX, floorTexY)
+            buffer(screen_height - y, x) = tilesheet(3, floorTexX, floorTexY)
         NEXT
 
     NEXT
 
-    'CALL draw_buffer(buffer())
-    FOR x = 0 TO screen_width - 1
-        FOR y = 0 TO screen_height - 1
-            ' Reduce flickering
+    IF TIMER(0.01) < show_title_flag + 5 THEN
+        CALL draw_titlescreen(buffer(), titlescreen())
+    END IF
+    CALL draw_buffer(buffer())
 
-
-            ' Fast PSET
-            DEF SEG = &HA000
-            POKE y * 320& + x, buffer(y, x)
-            DEF SEG
-
-
-
-            'PSET (x, y), buffer(y, x)
-        NEXT
-    NEXT
 
     'PCOPY 1, 0
 
@@ -389,8 +388,22 @@ WEND
 SUB draw_buffer (buffer() AS INTEGER)
     FOR x = 0 TO screen_width - 1
         FOR y = 0 TO screen_height - 1
+            ' Fast PSET
+            DEF SEG = &HA000
+            POKE y * 320& + x, buffer(y, x)
+            DEF SEG
+
             'PSET (x, y), buffer(y, x)
-            PSET (x, y)
+        NEXT
+    NEXT
+END SUB
+
+SUB draw_titlescreen (buffer() AS INTEGER, titlescreen() AS INTEGER)
+    FOR x = 0 TO screen_width - 1
+        FOR y = 0 TO screen_height - 1
+            IF (titlescreen(x, y) <> titlescreen(1, 1)) THEN
+                buffer(y, x) = titlescreen(x, y)
+            END IF
         NEXT
     NEXT
 END SUB
@@ -451,7 +464,7 @@ END SUB
 SUB screen_setup (screen_width AS INTEGER, screen_height AS INTEGER)
     'SCREEN 0
     SCREEN 13, 0, 1, 0
-    '_FULLSCREEN 'QB64 full screen mode, also works with alt+enter
+    _FULLSCREEN 'QB64 full screen mode, also works with alt+enter
 END SUB
 
 
@@ -571,9 +584,9 @@ END TYPE
 ' Function that stores a color and returns the color code
 FUNCTION add_color (red AS INTEGER, green AS INTEGER, blue AS INTEGER)
 
-    red = INT(red / 4)
-    green = INT(green / 4)
-    blue = INT(blue / 4)
+    red = INT(red)
+    green = INT(green)
+    blue = INT(blue)
 
     ' Check if palette is not full
     IF nrOfColors = 256 THEN
@@ -642,7 +655,7 @@ SUB load_tilesheet (filename AS STRING, tilesize AS INTEGER, tilesheet() AS INTE
             tileNr% = x + (sheetWidth * y)
             FOR i = 0 TO tilesize - 1
                 FOR j = 0 TO tilesize - 1
-                    tilesheet(tileNr%, j, i) = tiledata(j + (tilesize * x), i + (tilesize * y))
+                    tilesheet(tileNr%, j, i) = tiledata(j + (tilesize * x), i + (tilesize * y) + 1)
                 NEXT
             NEXT
         NEXT
@@ -680,12 +693,8 @@ SUB load_image (filename AS STRING, imgdata() AS INTEGER)
         GET #1, , a$: Grn = ASC(a$) \ 4
         GET #1, , a$: Red = ASC(a$) \ 4
 
-        'colorCode% = add_color(Red, Grn, Blu)
-        colorCode% = rgb_to_palette(Red, Grn, Blu)
-        'PRINT Red, Grn, Blu
-        'PRINT colorCode%
-        'PCOPY 1, 0
-        'SLEEP
+        colorCode% = add_color(Red, Grn, Blu)
+        'colorCode% = rgb_to_palette(Red, Grn, Blu)
 
         ' Store mapping
         bitmapToPalette(Colr) = colorCode%
@@ -767,7 +776,8 @@ SUB set_palette
         CALL set_palette_color(240 + i, i * s, i * s / 2, i * s)
 
     NEXT
-
+    CALL set_palette_color(0, 0, 0, 0)
+    CALL set_palette_color(1, 255, 255, 255)
     nrOfColors = 255
     CALL load_palette
 END SUB
